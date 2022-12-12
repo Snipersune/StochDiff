@@ -1,0 +1,259 @@
+%% Euler - Maruyama scheme
+
+clear
+close all
+
+rng(42);
+
+X_0 = 1;
+
+T = 1;
+dt = 2^(-9);
+t = dt:dt:T;
+N = cast(floor(T/dt), "int16");
+
+n_samples = 100;
+
+
+rands = randn(n_samples,N);
+sqrt_dt = sqrt(dt);
+
+dW = sqrt_dt.*rands;
+
+X = zeros(n_samples,N);
+X(:,1) = X_0;
+for i=2:N
+    X(:,i) = X(:,i-1) + X(:,i-1)*dt + 0.5*sqrt(X(:,i-1)).*dW(:,i-1);
+end
+
+mean_Xt = mean(X,1);
+
+figure();
+plot([0, t], [X_0,mean_Xt], "b-")
+hold on
+for i=1:5
+    plot([0, t], [X_0,X(i,:)], "r-.")
+end    
+legend(sprintf("E[X(t)] for %d realizations", n_samples), "5 individual paths", Location="northwest")
+%set(gca, "YScale", "log")
+xlabel('t', FontSize=14)
+ylabel('X(t)',FontSize=14)
+
+
+%% Geo Brown
+
+clear
+close all
+
+rng(42);
+
+lambda = 2; mu = 1; X_0 = 1;
+T = 1;
+
+dts = [2^(-13), 2^(-12), 2^(-11), 2^(-10), 2^-(9)];
+
+n_samples = 1;
+
+N = cast(floor(T/dts(1)), "int64");
+
+rands = randn(n_samples,N);
+sqrt_dt = sqrt(dts(1));
+
+dW = sqrt_dt.*rands;
+
+abs_errs = zeros(size(dts));
+
+figure()
+for i=1:size(dts,2)
+    dt = dts(i);
+    N = cast(floor(T/dt), "int64");
+ 
+    W = cumsum(dW,2);
+    X_sol = X_0*exp((lambda-0.5*mu^2)*(dt:dt:T) + mu*W);
+    
+    X = zeros(n_samples,N+1);
+    X(:,1) = X_0;
+    for j=2:N+1
+        X(:,j) = X(:,j-1) + lambda*X(:,j-1)*dt + mu*X(:,j-1).*dW(:,j-1);
+    end
+    plot(0:dt:T, [X_0, X_sol], "r--")
+    hold on
+    plot(0:dt:T, X, "b")
+    
+    abs_errs(i) = max(abs(X(1,end)-X_sol(end)));
+    
+    dW = coarsen(dW,2);
+end
+hold off
+legend("Known solution", "EM-approximation")
+xlabel("t")
+ylabel("X(t)")
+
+figure()
+plot(dts,abs_errs)
+xlabel("dt")
+ylabel("Error")
+
+figure()
+loglog(dts,abs_errs)
+hold on
+loglog(dts, dts.^(1/2), "--")
+legend("Obtained", "Reference slope")
+xlabel("dt")
+ylabel("Error")
+
+
+%% Weak conv
+
+clear
+close all
+
+rng(42);
+
+lambda = 2; mu = 0.1; X_0 = 1;
+T = 1;
+
+dts = [2^(-13), 2^(-12), 2^(-11), 2^(-10), 2^-(9)];
+
+n_samples = 50000;
+
+N = cast(floor(T/dts(1)), "int64");
+
+rands = randn(n_samples,N);
+sqrt_dt = sqrt(dts(1));
+
+dW = sqrt_dt.*rands;
+
+max_errs = zeros(size(dts));
+end_errs = zeros(size(dts));
+
+for i=1:size(dts,2)
+    dt = dts(i);
+    N = cast(floor(T/dt), "int64");
+ 
+    W = cumsum(dW,2);
+    X_sol = X_0*exp((lambda-0.5*mu^2)*repmat(dt:dt:T,[n_samples,1]) + mu*W);
+    
+    X = zeros(n_samples,N+1);
+    X(:,1) = X_0;
+    for j=2:N+1
+        X(:,j) = X(:,j-1) + lambda*X(:,j-1)*dt + mu*X(:,j-1).*dW(:,j-1);
+    end
+    
+    X_sol_mean = mean(X_sol,1);
+    X_mean = mean(X,1);
+    
+    max_errs(i) = max(abs(X_mean(2:end)-X_sol_mean));
+    end_errs(i) = abs(X_mean(end)-X_sol_mean(end));
+    
+    dW = coarsen(dW,2);
+end
+
+figure()
+plot(dts, max_errs)
+hold on
+plot(dts, end_errs)
+legend("max\_error", "end\_error")
+xlabel("dt")
+ylabel("Error")
+
+figure()
+loglog(dts, max_errs)
+hold on
+loglog(dts, end_errs)
+loglog(dts, dts, "--")
+legend("Obtained max", "Obtained end", "Reference slope")
+xlabel("dt")
+ylabel("Error")
+
+figure()
+plot(dts, max_errs-end_errs)
+
+
+%% Strong conv
+
+clear
+close all
+
+rng(42);
+
+lambda = 2; mu = 1; X_0 = 1;
+T = 1;
+
+dts = [2^(-13), 2^(-12), 2^(-11), 2^(-10), 2^-(9)];
+
+n_samples = 50000;
+
+N = cast(floor(T/dts(1)), "int64");
+
+rands = randn(n_samples,N);
+sqrt_dt = sqrt(dts(1));
+
+dW = sqrt_dt.*rands;
+
+max_errs = zeros(size(dts));
+end_errs = zeros(size(dts));
+
+for i=1:size(dts,2)
+    dt = dts(i);
+    N = cast(floor(T/dt), "int64");
+ 
+    W = cumsum(dW,2);
+    X_sol = X_0*exp((lambda-0.5*mu^2)*repmat(dt:dt:T,[n_samples,1]) + mu*W);
+    
+    X = zeros(n_samples,N+1);
+    X(:,1) = X_0;
+    for j=2:N+1
+        X(:,j) = X(:,j-1) + lambda*X(:,j-1)*dt + mu*X(:,j-1).*dW(:,j-1);
+    end
+    
+    all_errors = abs(X(:,2:end)-X_sol);
+    end_errors = all_errors(:,end);
+        
+    max_errs(i) = mean(max(all_errors,[],2));
+    end_errs(i) = mean(end_errors);
+    
+    dW = coarsen(dW,2);
+end
+
+
+figure()
+plot(dts, max_errs)
+hold on
+plot(dts, end_errs)
+legend("max\_error", "end\_error")
+xlabel("dt")
+ylabel("Error")
+
+figure()
+loglog(dts, max_errs)
+hold on
+loglog(dts, end_errs)
+loglog(dts, dts.^(1/2), "--")
+legend("Obtained max", "Obtained end", "Reference slope")
+xlabel("dt")
+ylabel("Error")
+
+figure()
+plot(dts, max_errs-end_errs)
+
+
+%% Param fitting
+clear
+close all
+
+data = load("parFitData.mat");
+
+samples = data.storage.samples;
+ts = data.storage.tVec;
+
+dt = ts(2)-ts(1); T = ts(end);
+N = size(ts,2)-1;
+X_0 = samples(1,1);
+
+mean_path = mean(samples,1);
+diff = mean_path(2:end)-mean_path(1:end-1);
+mu_estimate = sqrt(1/(dt*sum(mean_path(1:end-1)))*sum(diff.*diff));
+
+
+

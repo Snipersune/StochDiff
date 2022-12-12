@@ -3,7 +3,7 @@ function newDW = coarsen(dW,k)
     numProc = size(dW,1);
     N = size(dW,2);
 
-    newN = cast(floor(N/k), "int16");
+    newN = cast(floor(N/k), "int64");
     newDW = zeros(numProc,newN);
     for i = 1:newN
         indexVec = (k*(i-1)+1) : (k*(i-1)+k);
